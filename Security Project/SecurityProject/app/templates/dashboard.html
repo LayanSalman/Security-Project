@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+  <h2>Welcome, {{ username }}!</h2>
+
+  <h3>Post a Comment</h3>
+  <form method="POST">
+    {{ form.hidden_tag() }}
+    {{ form.content.label }}<br>
+    {{ form.content(rows=3, cols=40) }}<br>
+    {{ form.submit() }}
+  </form>
+
+  <h3>All Comments</h3>
+  {% for comment in comments %}
+   <!-- Fixed: Escape user input to prevent XSS -->
+   <p><strong>{{ comment.author.username }}</strong>: {{ comment.content }}</p> 
+
+    <!-- Vulnerable: Unsafe rendering of user input (XSS risk) -->
+    {# <p><strong>{{ comment.author.username }}</strong>: {{ comment.content | safe }}</p> #}
+  {% endfor %}
+
+  <a href="{{ url_for('main.logout') }}">Logout</a>
+{% endblock %}
