@@ -21,18 +21,46 @@ def home():
 def register():
     form = RegisterForm()
     if form.validate_on_submit():
-        # Secure password hashing (bcrypt) 
-        hashed_pw = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
 
-        # Insecure password hashing (MD5) 
-        # hashed_pw = hashlib.md5(form.password.data.encode()).hexdigest()
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
 
-        user = User(username=form.username.data, password_hash=hashed_pw)
-        db.session.add(user)
-        db.session.commit()
-        flash('Account created. You can now log in.', 'success')
-        return redirect(url_for('main.login'))
+        # FIXED: Secure password hashing (bcrypt)
+        hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+
+        # VULNERABLE: MD5 password hashing 
+        '''
+        # This uses MD5, which is insecure and fast to crack
+        hashed_pw = hashlib.md5(password.encode()).hexdigest()
+        '''
+
+        # FIXED: Secure registration using parameterized SQL
+        sql = text("INSERT INTO user (username, password_hash) VALUES (:username, :password)")
+        try:
+            with db.engine.connect() as connection:
+                connection.execute(sql, {"username": username, "password": hashed_pw})
+                flash('Account created using secure SQL', 'success')
+                return redirect(url_for('main.login'))
+        except Exception as e:
+            flash(f"SQL Error: {str(e)}", 'danger')
+
+        # VULNERABLE: Registration using raw SQL Injection 
+        '''
+        # This is vulnerable because user input is directly embedded in the SQL
+        username_safe = username.replace("'", "''")  # weak escaping, still vulnerable
+        sql = f"INSERT INTO user (username, password_hash) VALUES ('{username_safe}', '{password}')"
+        try:
+            with db.engine.connect() as connection:
+                connection.execute(text(sql))
+                flash('Account created (SQL Injection vulnerable) ', 'warning')
+                return redirect(url_for('main.login'))
+        except Exception as e:
+            flash(f"SQL Error: {str(e)}", 'danger')
+        '''
+   
+
     return render_template('register.html', form=form)
+
 
 @main.route('/login', methods=['GET', 'POST'])
 def login():
