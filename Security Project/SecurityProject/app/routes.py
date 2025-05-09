@@ -38,24 +38,48 @@ def register():
 def login():
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
 
-        if user:
-            # Secure bcrypt password check 
+        # FIXED: Secure SQL query 
+        sql = text("SELECT id, username, password_hash FROM user WHERE username = :username")
+        result = db.session.execute(sql, {"username": form.username.data}).fetchone()
+
+        # VULNERABLE: SQL Injection 
+        '''
+        sql = f"SELECT id, username, password_hash FROM user WHERE username = '{form.username.data}'"
+        result = db.session.execute(text(sql)).fetchone()
+        if result:
+            user_id, username, password_hash = result
+            user = User.query.get(user_id)
+            login_user(user)
+            flash('Login successful!', 'success')
+            return redirect(url_for('main.dashboard'))
+        else:
+            flash('Login failed. Invalid username or password.', 'danger')
+        '''
+
+        if result:
+            user_id, username, password_hash = result
+            user = User.query.get(user_id)
+
+            # FIXED: Secure bcrypt password check
             if bcrypt.check_password_hash(user.password_hash, form.password.data):
                 login_user(user)
                 flash('Login successful!', 'success')
                 return redirect(url_for('main.dashboard'))
 
-            # Insecure MD5 password check 
-            # input_pw = hashlib.md5(form.password.data.encode()).hexdigest()
-            # if user.password_hash == input_pw:
-            #   login_user(user)
-            #   flash('Login successful!', 'success')
-            #   return redirect(url_for('main.dashboard'))
+            # VULNERABLE: MD5 password check 
+            '''
+            input_pw = hashlib.md5(form.password.data.encode()).hexdigest()
+            if user.password_hash == input_pw:
+                login_user(user)
+                flash('Login successful using MD5', 'warning')
+                return redirect(url_for('main.dashboard'))
+            '''
+        else:
+            flash('Login failed. Invalid username or password.', 'danger')
 
-        flash('Login failed. Check credentials.', 'danger')
     return render_template('login.html', form=form)
+
 
 
 @main.route('/dashboard', methods=['GET', 'POST'])
